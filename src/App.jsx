@@ -1,15 +1,14 @@
-import React, { useCallback, useState } from "react";
-import ReactFlow, { Controls, Background, addEdge, applyEdgeChanges, applyNodeChanges,} from "reactflow";
+import React, { useState } from "react";
+import ReactFlow, {  Controls, Background, addEdge, applyEdgeChanges, applyNodeChanges } from "reactflow";
 import "reactflow/dist/style.css";
 import "./App.css";
 
-let nodeId = 1;
-const getId = () => `node_${nodeId++}`;
+let nodeCounter = 1;
+const createNodeId = () => `node_${nodeCounter++}`;
 
-const initialNodes = [
+const startingNodes = [
   {
     id: 'node_0',
-    type: "default",
     data: { label: "Main Topic" },
     position: { x: 350, y: 100 },
     style: {
@@ -21,57 +20,31 @@ const initialNodes = [
   },
 ];
 
-const initialEdges = [];
+function MindMappr() {
+  const [nodes, setNodes] = useState(startingNodes);
+  const [edges, setEdges] = useState([]);
+  const [activeNode, setActiveNode] = useState(null);
+  const [nodeName, setNodeName] = useState("");
 
-export default function MindMappr() {
-  const [nodes, setNodes] = useState(initialNodes);
-  const [edges, setEdges] = useState(initialEdges);
-  const [selectedNode, setSelectedNode] = useState(null);
-  const [nodeLabel, setNodeLabel] = useState("");
+  function selectNode(_, node) {
+    setActiveNode(node);
+    setNodeName(node.data.label);
+  }
 
-  const onNodesChange = useCallback(
-    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
-    []
-  );
-
-  const onEdgesChange = useCallback(
-    (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
-    []
-  );
-
-  const onConnect = useCallback(
-    (connection) => {
-      // Prevent self-connections
-      if (connection.source !== connection.target) {
-        setEdges((eds) => addEdge({
-          ...connection,
-          type: 'smoothstep',
-          animated: true,
-          style: { stroke: '#555' }
-        }, eds));
-      }
-    },
-    []
-  );
-
-  const handleNodeClick = useCallback((event, node) => {
-    setSelectedNode(node);
-    setNodeLabel(node.data.label);
-  }, []);
-
-  const addBranch = useCallback(() => {
-    if (!selectedNode) {
-      alert("Select a node to branch from!");
+  function addNewBranch() {
+    if (!activeNode) {
+      alert("Please select a node first!");
       return;
     }
 
-    const newNodeId = getId();
+    const newId = createNodeId();
+    
     const newNode = {
-      id: newNodeId,
+      id: newId,
       data: { label: "New Branch" },
       position: {
-        x: selectedNode.position.x + 200,
-        y: selectedNode.position.y + Math.random() * 160 - 80,
+        x: activeNode.position.x + 200,
+        y: activeNode.position.y + (Math.random() * 160 - 80),
       },
       style: {
         background: '#fff',
@@ -81,102 +54,89 @@ export default function MindMappr() {
       }
     };
 
-    setNodes((nds) => [...nds, newNode]);
-    setEdges((eds) => [
-      ...eds,
+    setNodes([...nodes, newNode]);
+    
+    setEdges([
+      ...edges,
       {
-        id: `e${selectedNode.id}-${newNodeId}`,
-        source: selectedNode.id,
-        target: newNodeId,
+        id: `e${activeNode.id}-${newId}`,
+        source: activeNode.id,
+        target: newId,
         type: 'smoothstep',
         animated: true,
         style: { stroke: '#555' }
       },
     ]);
-  }, [selectedNode]);
+  }
 
-  const deleteNode = useCallback(() => {
-    if (!selectedNode) {
-      alert("Select a node to delete!");
+  function removeNode() {
+    if (!activeNode) {
+      alert("Please select a node to delete!");
       return;
     }
 
-    if (selectedNode.id === 'node_0') {
-      alert("Cannot delete the main topic node!");
+    if (activeNode.id === 'node_0') {
+      alert("Can't delete the main topic node!");
       return;
     }
 
-    setEdges((eds) => eds.filter((e) => e.source !== selectedNode.id && e.target !== selectedNode.id));
-    setNodes((nds) => nds.filter((n) => n.id !== selectedNode.id));
-    setSelectedNode(null);
-    setNodeLabel("");
-  }, [selectedNode]);
+    setNodes(nodes.filter(n => n.id !== activeNode.id));
+    setEdges(edges.filter(e => e.source !== activeNode.id && e.target !== activeNode.id));
+    
+    setActiveNode(null);
+    setNodeName("");
+  }
 
-  const handleLabelChange = useCallback((e) => {
-    setNodeLabel(e.target.value);
-  }, []);
-
-  const updateLabel = useCallback(() => {
-    if (!selectedNode) {
+  function changeNodeName() {
+    if (!activeNode) {
       alert("Select a node to rename!");
       return;
     }
 
-    if (!nodeLabel.trim()) {
+    if (!nodeName.trim()) {
       alert("Label cannot be empty!");
       return;
     }
 
-    setNodes((nds) =>
-      nds.map((node) =>
-        node.id === selectedNode.id
-          ? { ...node, data: { ...node.data, label: nodeLabel.trim() } }
+    setNodes(
+      nodes.map(node => 
+        node.id === activeNode.id
+          ? { ...node, data: { ...node.data, label: nodeName.trim() } }
           : node
       )
     );
-  }, [selectedNode, nodeLabel]);
+  }
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
       <div className="mindmap-toolbar">
-        <button 
-          onClick={addBranch}
-          className="toolbar-button"
-        >
+        <button onClick={addNewBranch} className="toolbar-button">
           ➕ Add Branch
         </button>
-        <button 
-          onClick={deleteNode}
-          className="toolbar-button"
-        >
+        <button onClick={removeNode} className="toolbar-button">
           🗑️ Delete Node
         </button>
-        <input
-          type="text"
-          value={nodeLabel}
-          onChange={handleLabelChange}
-          placeholder="Edit label"
-          className="label-input"
-        />
-        <button 
-          onClick={updateLabel}
-          className="toolbar-button"
-        >
-          ✏️ Update Label
-        </button>
-        {selectedNode && (
+        <input type="text" value={nodeName} onChange={(e) => setNodeName(e.target.value)} placeholder="Edit label" className="label-input" />
+        <button onClick={changeNodeName} className="toolbar-button">  ✏️ Update Label</button>
+        {activeNode && (
           <span className="selected-node-info">
-            Selected: {selectedNode.data.label}
+            Selected: {activeNode.data.label}
           </span>
         )}
       </div>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onNodeClick={handleNodeClick}
+      
+      <ReactFlow nodes={nodes} edges={edges} onNodesChange={(changes) => setNodes(applyNodeChanges(changes, nodes))} onEdgesChange={(changes) => setEdges(applyEdgeChanges(changes, edges))}
+        onConnect={(connection) => {
+          if (connection.source !== connection.target) {
+            setEdges(addEdge({
+              ...connection,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: '#555' }
+            }, edges));
+          }
+        }}
+        onNodeClick={selectNode}
         fitView
         defaultEdgeOptions={{
           type: 'smoothstep',
@@ -190,3 +150,5 @@ export default function MindMappr() {
     </div>
   );
 }
+
+export default MindMappr;
